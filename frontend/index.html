@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ECS Control Tower</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0c10;
+      --surface: #111318;
+      --surface2: #181b22;
+      --border: #1e2330;
+      --accent: #00e5ff;
+      --accent2: #7c3aed;
+      --accent3: #10b981;
+      --accent4: #f59e0b;
+      --danger: #ef4444;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --font-head: 'Syne', sans-serif;
+      --font-mono: 'Space Mono', monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-head);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Grid noise texture */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.02) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      position: fixed;
+      left: 0; top: 0; bottom: 0;
+      width: 220px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      z-index: 100;
+      padding: 0;
+    }
+
+    .logo {
+      padding: 24px 20px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+    .logo h1 { font-size: 14px; font-weight: 800; color: var(--text); letter-spacing: 0.05em; }
+    .logo p { font-size: 10px; color: var(--muted); font-family: var(--font-mono); margin-top: 2px; }
+
+    .nav { flex: 1; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 8px;
+      cursor: pointer; transition: all 0.15s;
+      font-size: 13px; font-weight: 600;
+      color: var(--muted); border: none; background: none;
+      width: 100%; text-align: left;
+    }
+    .nav-item:hover { background: var(--surface2); color: var(--text); }
+    .nav-item.active { background: rgba(0,229,255,0.1); color: var(--accent); }
+    .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+
+    .sidebar-footer {
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    /* ── Main ── */
+    .main {
+      margin-left: 220px;
+      min-height: 100vh;
+      position: relative;
+      z-index: 1;
+    }
+
+    .topbar {
+      position: sticky; top: 0;
+      background: rgba(10,12,16,0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      z-index: 50;
+    }
+    .topbar-left h2 { font-size: 20px; font-weight: 800; }
+    .topbar-left p { font-size: 12px; color: var(--muted); font-family: var(--font-mono); margin-top: 2px; }
+
+    .status-pill {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 14px; border-radius: 999px;
+      font-size: 12px; font-family: var(--font-mono);
+      border: 1px solid;
+    }
+    .status-pill.ok { border-color: var(--accent3); color: var(--accent3); background: rgba(16,185,129,0.08); }
+    .status-pill.err { border-color: var(--danger); color: var(--danger); background: rgba(239,68,68,0.08); }
+    .status-pill.checking { border-color: var(--accent4); color: var(--accent4); background: rgba(245,158,11,0.08); }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{ opacity:1 } 50%{ opacity:0.3 } }
+
+    .content { padding: 32px; }
+
+    /* ── Pages ── */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ── Stat Cards ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px; margin-bottom: 32px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .stat-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+    .stat-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 2px;
+    }
+    .stat-card.c1::before { background: linear-gradient(90deg, var(--accent), transparent); }
+    .stat-card.c2::before { background: linear-gradient(90deg, var(--accent2), transparent); }
+    .stat-card.c3::before { background: linear-gradient(90deg, var(--accent3), transparent); }
+    .stat-card.c4::before { background: linear-gradient(90deg, var(--accent4), transparent); }
+
+    .stat-label { font-size: 11px; font-family: var(--font-mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+    .stat-value { font-size: 36px; font-weight: 800; margin: 8px 0 4px; line-height: 1; }
+    .stat-sub { font-size: 11px; color: var(--muted); }
+    .stat-icon { position: absolute; top: 16px; right: 16px; font-size: 28px; opacity: 0.15; }
+
+    /* ── Health Panel ── */
+    .health-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px;
+    }
+    .health-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .health-card h3 {
+      font-size: 13px; font-weight: 700;
+      color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.08em; margin-bottom: 16px;
+    }
+    .health-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+    }
+    .health-row:last-child { border-bottom: none; }
+    .health-key { color: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+    .health-val { font-weight: 700; font-family: var(--font-mono); font-size: 12px; }
+    .badge { padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+    .badge.green { background: rgba(16,185,129,0.15); color: var(--accent3); }
+    .badge.cyan { background: rgba(0,229,255,0.1); color: var(--accent); }
+    .badge.yellow { background: rgba(245,158,11,0.15); color: var(--accent4); }
+    .badge.red { background: rgba(239,68,68,0.15); color: var(--danger); }
+
+    /* ── Tables ── */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .table-header {
+      padding: 16px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .table-header h3 { font-size: 14px; font-weight: 700; }
+    .table-header span { font-size: 11px; font-family: var(--font-mono); color: var(--muted); }
+
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      padding: 10px 16px;
+      text-align: left; font-size: 10px;
+      font-family: var(--font-mono); color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.1em;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 12px 16px; font-size: 13px;
+      border-bottom: 1px solid rgba(30,35,48,0.5);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    .td-mono { font-family: var(--font-mono); font-size: 12px; }
+    .td-muted { color: var(--muted); font-size: 11px; font-family: var(--font-mono); }
+
+    /* ── Forms ── */
+    .form-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px; margin-bottom: 24px;
+    }
+    .form-section h3 { font-size: 14px; font-weight: 700; margin-bottom: 20px; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+    label { display: block; font-size: 11px; font-family: var(--font-mono); color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.08em; }
+    input, select, textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,229,255,0.1); }
+    select option { background: var(--surface2); }
+
+    .btn {
+      padding: 10px 20px; border-radius: 8px;
+      border: none; cursor: pointer;
+      font-family: var(--font-head); font-size: 13px; font-weight: 700;
+      transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-primary:hover { background: #00b8d4; transform: translateY(-1px); }
+    .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+    .btn-danger:hover { background: rgba(239,68,68,0.1); }
+    .btn-sm { padding: 5px 10px; font-size: 11px; border-radius: 6px; }
+    .btn-refresh {
+      background: var(--surface2); color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-refresh:hover { color: var(--text); border-color: var(--text); }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px 20px;
+      font-size: 13px; font-family: var(--font-mono);
+      z-index: 9999; transform: translateY(80px); opacity: 0;
+      transition: all 0.25s; max-width: 320px;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.success { border-color: var(--accent3); color: var(--accent3); }
+    #toast.error { border-color: var(--danger); color: var(--danger); }
+
+    /* ── Architecture Diagram ── */
+    .arch-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px; padding: 32px;
+      margin-bottom: 24px;
+    }
+    .arch-wrap h3 { font-size: 14px; font-weight: 700; margin-bottom: 24px; }
+    .tier-row {
+      display: flex; align-items: center; gap: 0;
+      margin-bottom: 0;
+    }
+    .tier-label {
+      width: 120px; flex-shrink: 0;
+      font-size: 10px; font-family: var(--font-mono);
+      color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .tier-nodes {
+      flex: 1; display: flex; gap: 12px; flex-wrap: wrap;
+      padding: 16px 0;
+    }
+    .tier-connector {
+      width: 120px; padding-left: 40px;
+      display: flex; align-items: center;
+      padding: 8px 0 8px 56px;
+    }
+    .arrow-down { font-size: 20px; color: var(--muted); }
+
+    .node {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 12px;
+      display: flex; align-items: center; gap: 8px;
+      transition: border-color 0.2s;
+    }
+    .node:hover { border-color: var(--accent); }
+    .node .dot2 { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .node.online .dot2 { background: var(--accent3); }
+    .node.db .dot2 { background: var(--accent4); }
+    .node.lb .dot2 { background: var(--accent); }
+
+    /* ── Loading ── */
+    .skeleton {
+      background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 6px;
+    }
+    @keyframes shimmer { 0%{background-position:200%} 100%{background-position:-200%} }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .sidebar { width: 60px; }
+      .sidebar .logo h1, .sidebar .logo p,
+      .nav-item span, .sidebar-footer { display: none; }
+      .logo-icon { margin-bottom: 0; }
+      .main { margin-left: 60px; }
+      .content { padding: 20px 16px; }
+      .health-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .topbar { padding: 12px 16px; }
+    }
+    @media (max-width: 480px) {
+      .stats-grid { grid-template-columns: 1fr; }
+      .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <h1>ECS TOWER</h1>
+    <p>ap-south-1</p>
+  </div>
+  <div class="nav">
+    <button class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard">
+      <span class="icon">◈</span><span>Dashboard</span>
+    </button>
+    <button class="nav-item" onclick="showPage('users')" id="nav-users">
+      <span class="icon">◉</span><span>Users</span>
+    </button>
+    <button class="nav-item" onclick="showPage('products')" id="nav-products">
+      <span class="icon">◫</span><span>Products</span>
+    </button>
+    <button class="nav-item" onclick="showPage('orders')" id="nav-orders">
+      <span class="icon">◎</span><span>Orders</span>
+    </button>
+    <button class="nav-item" onclick="showPage('architecture')" id="nav-architecture">
+      <span class="icon">⬡</span><span>Architecture</span>
+    </button>
+  </div>
+  <div class="sidebar-footer">
+    ECS 3-Tier v1.0<br/>Node.js + RDS
+  </div>
+</nav>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <h2 id="page-title">Dashboard</h2>
+      <p id="page-sub">System overview & health</p>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <div class="status-pill checking" id="db-status">
+        <div class="dot"></div>
+        <span>Checking DB…</span>
+      </div>
+      <button class="btn btn-refresh" onclick="refreshAll()">↺ Refresh</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- DASHBOARD PAGE -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card c1">
+          <div class="stat-label">Total Users</div>
+          <div class="stat-value" id="s-users">–</div>
+          <div class="stat-sub">Registered accounts</div>
+          <div class="stat-icon">◉</div>
+        </div>
+        <div class="stat-card c2">
+          <div class="stat-label">Products</div>
+          <div class="stat-value" id="s-products">–</div>
+          <div class="stat-sub">In catalog</div>
+          <div class="stat-icon">◫</div>
+        </div>
+        <div class="stat-card c3">
+          <div class="stat-label">Orders</div>
+          <div class="stat-value" id="s-orders">–</div>
+          <div class="stat-sub">All time</div>
+          <div class="stat-icon">◎</div>
+        </div>
+        <div class="stat-card c4">
+          <div class="stat-label">Revenue</div>
+          <div class="stat-value" id="s-revenue">–</div>
+          <div class="stat-sub">Completed orders</div>
+          <div class="stat-icon">$</div>
+        </div>
+      </div>
+
+      <div class="health-grid">
+        <div class="health-card">
+          <h3>🟢 System Health</h3>
+          <div id="health-rows">
+            <div class="health-row">
+              <span class="health-key">SERVER</span>
+              <span class="health-val" id="h-server">–</span>
+            </div>
+            <div class="health-row">
+              <span class="health-key">DATABASE</span>
+              <span class="health-val" id="h-db">–</span>
+            </div>
+            <div class="health-row">
+              <span class="health-key">UPTIME</span>
+              <span class="health-val" id="h-uptime">–</span>
+            </div>
+            <div class="health-row">
+              <span class="health-key">LATENCY</span>
+              <span class="health-val" id="h-latency">–</span>
+            </div>
+            <div class="health-row">
+              <span class="health-key">ENV</span>
+              <span class="health-val" id="h-env">–</span>
+            </div>
+            <div class="health-row">
+              <span class="health-key">DB TIME</span>
+              <span class="health-val" id="h-time" style="font-size:10px">–</span>
+            </div>
+          </div>
+        </div>
+        <div class="health-card">
+          <h3>🗄️ RDS PostgreSQL</h3>
+          <div class="health-row">
+            <span class="health-key">ENDPOINT</span>
+            <span class="health-val" style="font-size:9px;word-break:break-all">database-prj.cpasuyigmujp.ap-south-1.rds.amazonaws.com</span>
+          </div>
+          <div class="health-row">
+            <span class="health-key">PORT</span>
+            <span class="health-val">5432</span>
+          </div>
+          <div class="health-row">
+            <span class="health-key">ENGINE</span>
+            <span class="health-val"><span class="badge cyan">PostgreSQL</span></span>
+          </div>
+          <div class="health-row">
+            <span class="health-key">REGION</span>
+            <span class="health-val">ap-south-1a</span>
+          </div>
+          <div class="health-row">
+            <span class="health-key">VPC</span>
+            <span class="health-val" style="font-size:10px">project-ecs-vpc</span>
+          </div>
+          <div class="health-row">
+            <span class="health-key">DB STATUS</span>
+            <span class="health-val" id="h-db2">–</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Orders -->
+      <div class="table-wrap">
+        <div class="table-header">
+          <h3>Recent Orders</h3>
+          <span id="orders-count">loading…</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>#ID</th><th>User</th><th>Product</th>
+                <th>Qty</th><th>Total</th><th>Status</th><th>Date</th>
+              </tr>
+            </thead>
+            <tbody id="orders-tbody">
+              <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- USERS PAGE -->
+    <div class="page" id="page-users">
+      <div class="form-section">
+        <h3>➕ Add New User</h3>
+        <div class="form-grid">
+          <div>
+            <label>Full Name</label>
+            <input id="u-name" type="text" placeholder="John Doe" />
+          </div>
+          <div>
+            <label>Email</label>
+            <input id="u-email" type="email" placeholder="john@example.com" />
+          </div>
+          <div>
+            <label>Role</label>
+            <select id="u-role">
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:16px">
+          <button class="btn btn-primary" onclick="addUser()">+ Add User</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <h3>All Users</h3>
+          <span id="users-count">–</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead>
+              <tr><th>#ID</th><th>Name</th><th>Email</th><th>Role</th><th>Created</th><th>Action</th></tr>
+            </thead>
+            <tbody id="users-tbody">
+              <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRODUCTS PAGE -->
+    <div class="page" id="page-products">
+      <div class="form-section">
+        <h3>➕ Add New Product</h3>
+        <div class="form-grid">
+          <div>
+            <label>Product Name</label>
+            <input id="p-name" type="text" placeholder="Cloud Addon" />
+          </div>
+          <div>
+            <label>Price ($)</label>
+            <input id="p-price" type="number" placeholder="29.99" step="0.01" />
+          </div>
+          <div>
+            <label>Stock</label>
+            <input id="p-stock" type="number" placeholder="100" />
+          </div>
+          <div>
+            <label>Description</label>
+            <input id="p-desc" type="text" placeholder="Optional description" />
+          </div>
+        </div>
+        <div style="margin-top:16px">
+          <button class="btn btn-primary" onclick="addProduct()">+ Add Product</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <h3>All Products</h3>
+          <span id="products-count">–</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead>
+              <tr><th>#ID</th><th>Name</th><th>Description</th><th>Price</th><th>Stock</th><th>Action</th></tr>
+            </thead>
+            <tbody id="products-tbody">
+              <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ORDERS PAGE -->
+    <div class="page" id="page-orders">
+      <div class="form-section">
+        <h3>➕ Place New Order</h3>
+        <div class="form-grid">
+          <div>
+            <label>User ID</label>
+            <input id="o-uid" type="number" placeholder="1" />
+          </div>
+          <div>
+            <label>Product ID</label>
+            <input id="o-pid" type="number" placeholder="1" />
+          </div>
+          <div>
+            <label>Quantity</label>
+            <input id="o-qty" type="number" placeholder="1" value="1" />
+          </div>
+        </div>
+        <div style="margin-top:16px">
+          <button class="btn btn-primary" onclick="addOrder()">+ Place Order</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <h3>All Orders</h3>
+          <span id="orders-count2">–</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead>
+              <tr><th>#ID</th><th>User</th><th>Product</th><th>Qty</th><th>Total</th><th>Status</th><th>Date</th></tr>
+            </thead>
+            <tbody id="orders-tbody2">
+              <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ARCHITECTURE PAGE -->
+    <div class="page" id="page-architecture">
+      <div class="arch-wrap">
+        <h3>☁️ AWS 3-Tier ECS Architecture</h3>
+
+        <div class="tier-row">
+          <div class="tier-label">TIER 1<br/>Presentation</div>
+          <div class="tier-nodes">
+            <div class="node lb"><div class="dot2"></div>Application Load Balancer<br/><small style="color:var(--muted)">myalbsg · Port 80/443</small></div>
+            <div class="node lb"><div class="dot2"></div>Route 53<br/><small style="color:var(--muted)">DNS routing</small></div>
+          </div>
+        </div>
+        <div class="tier-connector"><div class="arrow-down">↓</div></div>
+
+        <div class="tier-row">
+          <div class="tier-label">TIER 2<br/>Application</div>
+          <div class="tier-nodes">
+            <div class="node online"><div class="dot2"></div>ECS Cluster<br/><small style="color:var(--muted)">Fargate tasks · ap-south-1</small></div>
+            <div class="node online"><div class="dot2"></div>Node.js API<br/><small style="color:var(--muted)">ecs_sg · Port 5000</small></div>
+            <div class="node online"><div class="dot2"></div>Auto Scaling Group<br/><small style="color:var(--muted)">Min 1 · Max 4</small></div>
+          </div>
+        </div>
+        <div class="tier-connector"><div class="arrow-down">↓</div></div>
+
+        <div class="tier-row">
+          <div class="tier-label">TIER 3<br/>Data</div>
+          <div class="tier-nodes">
+            <div class="node db"><div class="dot2"></div>RDS PostgreSQL<br/><small style="color:var(--muted)">myrds_sg · Port 5432 · ap-south-1a</small></div>
+            <div class="node db"><div class="dot2"></div>DB Subnet Group<br/><small style="color:var(--muted)">private subnets · no public access</small></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="health-grid">
+        <div class="health-card">
+          <h3>🔒 Security Groups</h3>
+          <div class="health-row">
+            <span class="health-key">ALB SG</span>
+            <span class="health-val"><span class="badge cyan">sg-0e6384066c6366218</span></span>
+          </div>
+          <div class="health-row">
+            <span class="health-key">Inbound</span>
+            <span class="health-val">80 HTTP · 443 HTTPS</span>
+          </div>
+          <div class="health-row">
+            <span class="health-key">ECS SG</span>
+            <span class="health-val"><span class="badge cyan">sg-022ada367347cd7e4</span></span>
+          </div>
+          <div class="health-row">
+            <span class="health-key">Inbound</span>
+            <span class="health-val">22 SSH · 5000 from ALB</span>
+          </div>
+          <div class="health-row">
+            <span class="health-key">RDS SG</span>
+            <span class="health-val"><span class="badge cyan">sg-071c142ab5e698041</span></span>
+          </div>
+          <div class="health-row">
+            <span class="health-key">Inbound</span>
+            <span class="health-val">5432 from ECS only</span>
+          </div>
+        </div>
+        <div class="health-card">
+          <h3>🚀 Next Steps (ECS Deployment)</h3>
+          <div class="health-row">
+            <span class="health-key">STEP 1</span>
+            <span class="health-val"><span class="badge green">✓ Local Test</span></span>
+          </div>
+          <div class="health-row">
+            <span class="health-key">STEP 2</span>
+            <span class="health-val"><span class="badge yellow">Dockerize App</span></span>
+          </div>
+          <div class="health-row">
+            <span class="health-key">STEP 3</span>
+            <span class="health-val"><span class="badge yellow">Push to ECR</span></span>
+          </div>
+          <div class="health-row">
+            <span class="health-key">STEP 4</span>
+            <span class="health-val"><span class="badge yellow">ECS Task Definition</span></span>
+          </div>
+          <div class="health-row">
+            <span class="health-key">STEP 5</span>
+            <span class="health-val"><span class="badge yellow">ALB + Target Group</span></span>
+          </div>
+          <div class="health-row">
+            <span class="health-key">STEP 6</span>
+            <span class="health-val"><span class="badge yellow">ASG + ECS Service</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<div id="toast"></div>
+
+<script>
+  const API = '';
+
+  // ── Navigation ──────────────────────────────────────────────────────────────
+  const pageTitles = {
+    dashboard: ['Dashboard', 'System overview & health'],
+    users: ['Users', 'Manage user accounts'],
+    products: ['Products', 'Product catalog'],
+    orders: ['Orders', 'Order management'],
+    architecture: ['Architecture', 'AWS 3-tier ECS setup']
+  };
+
+  function showPage(name) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('page-' + name).classList.add('active');
+    document.getElementById('nav-' + name).classList.add('active');
+    const [title, sub] = pageTitles[name];
+    document.getElementById('page-title').textContent = title;
+    document.getElementById('page-sub').textContent = sub;
+    if (name === 'users') loadUsers();
+    if (name === 'products') loadProducts();
+    if (name === 'orders') loadOrders();
+  }
+
+  // ── Toast ───────────────────────────────────────────────────────────────────
+  function toast(msg, type='success') {
+    const el = document.getElementById('toast');
+    el.textContent = (type === 'success' ? '✓ ' : '✗ ') + msg;
+    el.className = 'show ' + type;
+    clearTimeout(window._toastT);
+    window._toastT = setTimeout(() => el.classList.remove('show'), 3000);
+  }
+
+  // ── Health Check ────────────────────────────────────────────────────────────
+  async function checkHealth() {
+    const pill = document.getElementById('db-status');
+    pill.className = 'status-pill checking';
+    pill.innerHTML = '<div class="dot"></div><span>Checking…</span>';
+    try {
+      const r = await fetch(API + '/api/health');
+      const d = await r.json();
+      if (d.status === 'healthy') {
+        pill.className = 'status-pill ok';
+        pill.innerHTML = '<div class="dot"></div><span>DB Connected</span>';
+        document.getElementById('h-server').innerHTML = '<span class="badge green">RUNNING</span>';
+        document.getElementById('h-db').innerHTML = '<span class="badge green">CONNECTED</span>';
+        document.getElementById('h-db2').innerHTML = '<span class="badge green">ACTIVE</span>';
+      } else {
+        pill.className = 'status-pill err';
+        pill.innerHTML = '<div class="dot"></div><span>DB Error</span>';
+        document.getElementById('h-server').innerHTML = '<span class="badge green">RUNNING</span>';
+        document.getElementById('h-db').innerHTML = '<span class="badge red">DISCONNECTED</span>';
+        document.getElementById('h-db2').innerHTML = '<span class="badge red">ERROR</span>';
+      }
+      document.getElementById('h-uptime').textContent = formatUptime(d.uptime_seconds || 0);
+      document.getElementById('h-latency').textContent = (d.latency_ms || 0) + ' ms';
+      document.getElementById('h-env').innerHTML = '<span class="badge cyan">' + (d.environment || 'dev').toUpperCase() + '</span>';
+      if (d.db_time) {
+        document.getElementById('h-time').textContent = new Date(d.db_time).toLocaleString();
+      }
+    } catch (e) {
+      pill.className = 'status-pill err';
+      pill.innerHTML = '<div class="dot"></div><span>Server Down</span>';
+    }
+  }
+
+  async function loadStats() {
+    try {
+      const r = await fetch(API + '/api/stats');
+      const d = await r.json();
+      document.getElementById('s-users').textContent = d.users ?? '–';
+      document.getElementById('s-products').textContent = d.products ?? '–';
+      document.getElementById('s-orders').textContent = d.orders ?? '–';
+      document.getElementById('s-revenue').textContent = d.revenue ? '$' + d.revenue.toFixed(2) : '$0';
+    } catch (e) {}
+  }
+
+  function formatUptime(s) {
+    if (s < 60) return s + 's';
+    if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60) + 's';
+    return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+  }
+
+  // ── Users ───────────────────────────────────────────────────────────────────
+  async function loadUsers() {
+    try {
+      const r = await fetch(API + '/api/users');
+      const d = await r.json();
+      document.getElementById('users-count').textContent = d.count + ' total';
+      const tbody = document.getElementById('users-tbody');
+      if (!d.data?.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">No users found</td></tr>'; return; }
+      tbody.innerHTML = d.data.map(u => `
+        <tr>
+          <td class="td-mono">#${u.id}</td>
+          <td>${u.name}</td>
+          <td class="td-muted">${u.email}</td>
+          <td><span class="badge ${u.role==='admin'?'red':u.role==='manager'?'yellow':'cyan'}">${u.role.toUpperCase()}</span></td>
+          <td class="td-muted">${new Date(u.created_at).toLocaleDateString()}</td>
+          <td><button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">Delete</button></td>
+        </tr>`).join('');
+    } catch(e) { toast('Failed to load users', 'error'); }
+  }
+
+  async function addUser() {
+    const name = document.getElementById('u-name').value.trim();
+    const email = document.getElementById('u-email').value.trim();
+    const role = document.getElementById('u-role').value;
+    if (!name || !email) return toast('Name and email required', 'error');
+    try {
+      const r = await fetch(API+'/api/users', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name,email,role}) });
+      const d = await r.json();
+      if (d.success) { toast('User added!'); document.getElementById('u-name').value=''; document.getElementById('u-email').value=''; loadUsers(); }
+      else toast(d.error || 'Error adding user', 'error');
+    } catch(e) { toast('Request failed', 'error'); }
+  }
+
+  async function deleteUser(id) {
+    if (!confirm('Delete user #' + id + '?')) return;
+    await fetch(API+'/api/users/'+id, { method:'DELETE' });
+    toast('User deleted'); loadUsers();
+  }
+
+  // ── Products ─────────────────────────────────────────────────────────────────
+  async function loadProducts() {
+    try {
+      const r = await fetch(API + '/api/products');
+      const d = await r.json();
+      document.getElementById('products-count').textContent = d.count + ' total';
+      const tbody = document.getElementById('products-tbody');
+      if (!d.data?.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">No products</td></tr>'; return; }
+      tbody.innerHTML = d.data.map(p => `
+        <tr>
+          <td class="td-mono">#${p.id}</td>
+          <td>${p.name}</td>
+          <td class="td-muted">${p.description || '—'}</td>
+          <td style="color:var(--accent3);font-weight:700">$${parseFloat(p.price).toFixed(2)}</td>
+          <td class="td-mono">${p.stock}</td>
+          <td><button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})">Delete</button></td>
+        </tr>`).join('');
+    } catch(e) { toast('Failed to load products', 'error'); }
+  }
+
+  async function addProduct() {
+    const name = document.getElementById('p-name').value.trim();
+    const price = document.getElementById('p-price').value;
+    const stock = document.getElementById('p-stock').value;
+    const description = document.getElementById('p-desc').value.trim();
+    if (!name || !price) return toast('Name and price required', 'error');
+    try {
+      const r = await fetch(API+'/api/products', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name,price,stock,description}) });
+      const d = await r.json();
+      if (d.success) { toast('Product added!'); document.getElementById('p-name').value=''; document.getElementById('p-price').value=''; loadProducts(); }
+      else toast(d.error || 'Error', 'error');
+    } catch(e) { toast('Request failed', 'error'); }
+  }
+
+  async function deleteProduct(id) {
+    if (!confirm('Delete product #' + id + '?')) return;
+    await fetch(API+'/api/products/'+id, { method:'DELETE' });
+    toast('Product deleted'); loadProducts();
+  }
+
+  // ── Orders ───────────────────────────────────────────────────────────────────
+  function statusBadge(s) {
+    const map = { completed:'green', pending:'yellow', processing:'cyan' };
+    return `<span class="badge ${map[s]||'cyan'}">${s.toUpperCase()}</span>`;
+  }
+
+  async function loadOrders() {
+    try {
+      const r = await fetch(API + '/api/orders');
+      const d = await r.json();
+      const countEl1 = document.getElementById('orders-count');
+      const countEl2 = document.getElementById('orders-count2');
+      if (countEl1) countEl1.textContent = d.count + ' total';
+      if (countEl2) countEl2.textContent = d.count + ' total';
+
+      const rows = d.data?.map(o => `
+        <tr>
+          <td class="td-mono">#${o.id}</td>
+          <td>${o.user_name}</td>
+          <td>${o.product_name}</td>
+          <td class="td-mono">${o.quantity}</td>
+          <td style="color:var(--accent3);font-weight:700">$${parseFloat(o.total).toFixed(2)}</td>
+          <td>${statusBadge(o.status)}</td>
+          <td class="td-muted">${new Date(o.created_at).toLocaleDateString()}</td>
+        </tr>`).join('') || '';
+
+      const tbody1 = document.getElementById('orders-tbody');
+      const tbody2 = document.getElementById('orders-tbody2');
+      if (tbody1) tbody1.innerHTML = rows || '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">No orders</td></tr>';
+      if (tbody2) tbody2.innerHTML = rows || '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">No orders</td></tr>';
+    } catch(e) { toast('Failed to load orders', 'error'); }
+  }
+
+  async function addOrder() {
+    const user_id = document.getElementById('o-uid').value;
+    const product_id = document.getElementById('o-pid').value;
+    const quantity = document.getElementById('o-qty').value || 1;
+    if (!user_id || !product_id) return toast('User ID and Product ID required', 'error');
+    try {
+      const r = await fetch(API+'/api/orders', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({user_id,product_id,quantity}) });
+      const d = await r.json();
+      if (d.success) { toast('Order placed!'); loadOrders(); }
+      else toast(d.error || 'Error', 'error');
+    } catch(e) { toast('Request failed', 'error'); }
+  }
+
+  // ── Refresh All ─────────────────────────────────────────────────────────────
+  function refreshAll() {
+    checkHealth();
+    loadStats();
+    loadOrders();
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────────
+  refreshAll();
+  setInterval(checkHealth, 30000);
+</script>
+</body>
+</html>

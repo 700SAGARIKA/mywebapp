@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::706059253979:oidc-provider/oidc.eks.ap-south-1.amazonaws.com/id/837994131F9600EDB7B065BB411AC0B4"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "oidc.eks.ap-south-1.amazonaws.com/id/837994131F9600EDB7B065BB411AC0B4:sub": "system:serviceaccount:default:ecs-app-sa"
+        }
+      }
+    }
+  ]
+}
