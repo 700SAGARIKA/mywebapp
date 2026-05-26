@@ -1,4 +1,66 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+coverage
+*.lcov
+.nyc_output
+
+# Dependency directories
 node_modules/
+jspm_packages/
+bower_components
+
+# Build outputs
+dist
+build/Release
+.next
+.nuxt
+.output
+.cache
+.parcel-cache
+
+# Environment files
 .env
-*.pem
+.env.*
+!.env.example
+
+# AWS / Certificates
 aws-secret.yaml
+*.pem
+
+# Optional caches
+.npm
+.eslintcache
+.stylelintcache
+
+# IDE / Testing
+.vscode-test
+
+# Yarn
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# Misc
+*.tgz
+.firebase/
+.serverless/
+.dynamodb/
+.pnpm-store
+.vite/
