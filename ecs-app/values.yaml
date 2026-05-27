@@ -78,18 +78,6 @@ autoscaling:
   maxReplicas: 5
   targetCPUUtilizationPercentage: 70
 
-env:
-  - name: PORT
-    value: "5000"
-
-  - name: NODE_ENV
-    value: "production"
-
-  - name: AWS_REGION
-    value: "ap-south-1"
-
-  - name: SECRET_NAME
-    value: "my_postgres"
 httpRoute:
   enabled: false
 

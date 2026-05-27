@@ -51,8 +51,9 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
 
-          env:
-            {{- toYaml .Values.env | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                  name: ecs-app-config
 
           ports:
             - name: http

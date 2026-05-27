@@ -153,6 +153,158 @@ app.delete("/api/users/:id", async (req, res) => {
     });
   }
 });
+// Create product
+app.post("/api/products", async (req, res) => {
+  try {
+    const { name, price, stock, description } = req.body;
+
+    if (!name || !price) {
+      return res.status(400).json({
+        success: false,
+        error: "Name and price required",
+      });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO products (name, price, stock, description)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [
+        name,
+        price,
+        stock || 0,
+        description || null,
+      ]
+    );
+
+    res.status(201).json({
+      success: true,
+      data: result.rows[0],
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
+// Delete product
+app.delete("/api/products/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await pool.query(
+      "DELETE FROM products WHERE id = $1",
+      [id]
+    );
+
+    res.json({
+      success: true,
+      message: "Product deleted",
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+// Create order
+app.post("/api/orders", async (req, res) => {
+  try {
+    const {
+      user_id,
+      product_id,
+      quantity,
+    } = req.body;
+
+    if (!user_id || !product_id) {
+      return res.status(400).json({
+        success: false,
+        error: "user_id and product_id required",
+      });
+    }
+
+    // Get product price
+    const productResult = await pool.query(
+      "SELECT * FROM products WHERE id = $1",
+      [product_id]
+    );
+
+    if (productResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Product not found",
+      });
+    }
+
+    const product = productResult.rows[0];
+
+    const total =
+      parseFloat(product.price) *
+      parseInt(quantity || 1);
+
+    const result = await pool.query(
+      `INSERT INTO orders
+      (user_id, product_id, quantity, total, status)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *`,
+      [
+        user_id,
+        product_id,
+        quantity || 1,
+        total,
+        "completed",
+      ]
+    );
+
+    res.status(201).json({
+      success: true,
+      data: result.rows[0],
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+// Dashboard stats
+app.get("/api/stats", async (req, res) => {
+  try {
+    const users = await pool.query(
+      "SELECT COUNT(*) FROM users"
+    );
+
+    const products = await pool.query(
+      "SELECT COUNT(*) FROM products"
+    );
+
+    const orders = await pool.query(
+      "SELECT COUNT(*) FROM orders"
+    );
+
+    const revenue = await pool.query(
+      `SELECT COALESCE(SUM(total),0) AS revenue
+       FROM orders
+       WHERE status = 'completed'`
+    );
+
+    res.json({
+      users: parseInt(users.rows[0].count),
+      products: parseInt(products.rows[0].count),
+      orders: parseInt(orders.rows[0].count),
+      revenue: parseFloat(
+        revenue.rows[0].revenue
+      ),
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: err.message,
+    });
+  }
+});
 
 // ─── Serve Frontend ─────────────────────────
 app.use(express.static(path.join(__dirname, "../frontend")));
@@ -162,19 +314,44 @@ app.get("/api/users", async (req, res) => {
   res.json({ success: true, data: result.rows });
 });
 app.get("/api/products", async (req, res) => {
-  const result = await pool.query("SELECT * FROM products ORDER BY id");
-  res.json({ success: true, data: result.rows });
+  try {
+    const result = await pool.query(
+      "SELECT * FROM products ORDER BY id"
+    );
+
+    res.json({
+      success: true,
+      count: result.rows.length,
+      data: result.rows,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
 });
 app.get("/api/orders", async (req, res) => {
-  const result = await pool.query(`
-    SELECT o.*, u.name as user_name, p.name as product_name
-    FROM orders o
-    JOIN users u ON o.user_id = u.id
-    JOIN products p ON o.product_id = p.id
-    ORDER BY o.id DESC
-  `);
+  try {
+    const result = await pool.query(`
+      SELECT o.*, u.name as user_name, p.name as product_name
+      FROM orders o
+      JOIN users u ON o.user_id = u.id
+      JOIN products p ON o.product_id = p.id
+      ORDER BY o.id DESC
+    `);
 
-  res.json({ success: true, data: result.rows });
+    res.json({
+      success: true,
+      count: result.rows.length,
+      data: result.rows,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
 });
 app.get("*", (req, res) => {
   res.sendFile(
