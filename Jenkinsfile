@@ -127,7 +127,7 @@ ${ECR_REGISTRY}/${ECR_REPO}:${params.IMAGE_TAG}
 Build URL:
 ${BUILD_URL}
 """,
-to: "[yourmail@gmail.com]"
+to: "sagarikamishra087@gmail.com"
 )
 }
 
@@ -155,7 +155,7 @@ Possible Failure Reasons:
 Console Logs:
 ${BUILD_URL}console
 """,
-to: "[yourmail@gmail.com]"
+to: "sagarikamishra087@gmail.com"
 )
 }
 }
