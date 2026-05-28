@@ -3,7 +3,7 @@ kind: ConfigMap
 
 metadata:
   name: ecs-app-config
-  namespace: ecs-app
+  namespace: default
 
 data:
   PORT: "5000"
