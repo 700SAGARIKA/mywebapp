@@ -10,7 +10,7 @@ pipeline {
 
     stages {
 
-        stage(Build Docker Image) {
+        stage("Build Docker Image") {
             steps {
                 sh """
                     docker build -t ${ECR_REPO}:${IMAGE_TAG} .
@@ -18,7 +18,7 @@ pipeline {
             }
         }
 
-        stage(Login to ECR) {
+        stage("Login to ECR") {
             steps {
                 sh """
                     aws ecr get-login-password --region ${AWS_REGION} | \
@@ -27,7 +27,7 @@ pipeline {
             }
         }
 
-        stage(Tag Image) {
+        stage("Tag Image") {
             steps {
                 sh """
                     docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_REGISTRY}/${ECR_REPO}:${IMAGE_TAG}
@@ -35,7 +35,7 @@ pipeline {
             }
         }
 
-        stage(Push to ECR) {
+        stage("Push to ECR") {
             steps {
                 sh """
                     docker push ${ECR_REGISTRY}/${ECR_REPO}:${IMAGE_TAG}
@@ -43,7 +43,7 @@ pipeline {
             }
         }
 
-        stage(Deploy to EKS with Helm) {
+        stage("Deploy to EKS with Helm") {
             steps {
                 sh """
                     aws eks update-kubeconfig \
