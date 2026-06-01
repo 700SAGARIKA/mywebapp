@@ -43,7 +43,7 @@ Environment: ${params.ENVIRONMENT}
 Build URL:
 ${BUILD_URL}
 """,
-                    to: "sagarikamishra087@gmail.com"
+                    to: "sagarika.mishra@vvdntech.in"
                 )
             }
         }
@@ -124,7 +124,7 @@ ${ECR_REGISTRY}/${ECR_REPO}:${env.TAG}
 Build URL:
 ${BUILD_URL}
 """,
-                to: "sagarikamishra087@gmail.com"
+                to: "sagarika.mishra@vvdntech.in"
             )
         }
 
@@ -144,7 +144,7 @@ ${env.STAGE_NAME}
 Console Logs:
 ${BUILD_URL}console
 """,
-                to: "sagarikamishra087@gmail.com"
+                to: "sagarika.mishra@vvdntech.in"
             )
         }
     }
