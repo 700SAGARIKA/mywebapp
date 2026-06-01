@@ -64,6 +64,8 @@ async function createPool() {
 
 // ─── Health Check API ───────────────────────
 app.get("/api/health", async (req, res) => {
+  const start = Date.now();
+
   try {
     const result = await pool.query(
       "SELECT NOW() AS db_time, version() AS db_version"
@@ -75,12 +77,14 @@ app.get("/api/health", async (req, res) => {
       db_time: result.rows[0].db_time,
       db_version: result.rows[0].db_version,
       environment: process.env.NODE_ENV,
+      uptime_seconds: Math.floor(process.uptime()),
+      latency_ms: Date.now() - start
     });
   } catch (err) {
     res.status(500).json({
       status: "unhealthy",
       database: "disconnected",
-      error: err.message,
+      error: err.message
     });
   }
 });

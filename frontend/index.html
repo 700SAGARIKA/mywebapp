@@ -752,13 +752,11 @@
         pill.innerHTML = '<div class="dot"></div><span>DB Connected</span>';
         document.getElementById('h-server').innerHTML = '<span class="badge green">RUNNING</span>';
         document.getElementById('h-db').innerHTML = '<span class="badge green">CONNECTED</span>';
-        document.getElementById('h-db2').innerHTML = '<span class="badge green">ACTIVE</span>';
       } else {
         pill.className = 'status-pill err';
         pill.innerHTML = '<div class="dot"></div><span>DB Error</span>';
         document.getElementById('h-server').innerHTML = '<span class="badge green">RUNNING</span>';
         document.getElementById('h-db').innerHTML = '<span class="badge red">DISCONNECTED</span>';
-        document.getElementById('h-db2').innerHTML = '<span class="badge red">ERROR</span>';
       }
       document.getElementById('h-uptime').textContent = formatUptime(d.uptime_seconds || 0);
       document.getElementById('h-latency').textContent = (d.latency_ms || 0) + ' ms';
