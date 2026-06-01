@@ -39,12 +39,14 @@ ingress:
   enabled: true
   className: alb
   annotations:
+    alb.ingress.kubernetes.io/healthcheck-path: /api/health
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/healthcheck-path: /api/health
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:706059253979:certificate/39b11e50-8f42-4b8e-a841-641fea4dac25
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
   hosts:
-    - host: ""
+    - host: ordr.fun
       paths:
         - path: /
           pathType: Prefix
