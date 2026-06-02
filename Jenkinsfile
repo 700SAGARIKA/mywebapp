@@ -13,9 +13,9 @@ pipeline {
         )
 
         string(
-            name: IMAGE_TAG,
+            name: 'IMAGE_TAG',
             defaultValue:'',
-            description: Docker Image Tag
+            description: 'Docker Image Tag'
         )
     }
 
