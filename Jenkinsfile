@@ -8,7 +8,7 @@ pipeline {
     parameters {
         choice(
             name: 'ENVIRONMENT',
-            choices: [dev, stage, prod],
+            choices: ['dev', 'stage', 'prod'],
             description: 'Deployment Environment'
         )
 
@@ -27,7 +27,7 @@ pipeline {
 
     stages {
 
-        stage(Checkout) {
+        stage("Checkout") {
             steps {
                 checkout scm
             }
@@ -39,7 +39,7 @@ pipeline {
                     env.BUILD_START_TIME = System.currentTimeMillis().toString()
 
                     def cause = currentBuild.getBuildCauses()[0]
-                    env.TRIGGERED_BY = cause?.userId ?: cause?.shortDescription ?: Automated/Unknown
+                    env.TRIGGERED_BY = cause?.userId ?: cause?.shortDescription ?: 'Automated/Unknown'
 
                     env.GIT_BRANCH_NAME = sh(
                         script: "git rev-parse --abbrev-ref HEAD",
