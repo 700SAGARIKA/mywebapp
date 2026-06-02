@@ -1,5 +1,4 @@
 pipeline {
-
     agent any
 
     options {
@@ -7,17 +6,16 @@ pipeline {
     }
 
     parameters {
-
         choice(
-            name: 'ENVIRONMENT',
-            choices: ['dev', 'stage', 'prod'],
-            description: 'Deployment Environment'
+            name: ENVIRONMENT,
+            choices: [dev, stage, prod],
+            description: Deployment Environment
         )
 
         string(
-            name: 'IMAGE_TAG',
-            defaultValue: '',
-            description: 'Docker Image Tag'
+            name: IMAGE_TAG,
+            defaultValue: ,
+            description: Docker Image Tag
         )
     }
 
@@ -29,21 +27,51 @@ pipeline {
 
     stages {
 
+        stage(Checkout) {
+            steps {
+                checkout scm
+            }
+        }
+
         stage("Build Started Notification") {
             steps {
+                script {
+                    env.BUILD_START_TIME = System.currentTimeMillis().toString()
+
+                    def cause = currentBuild.getBuildCauses()[0]
+                    env.TRIGGERED_BY = cause?.userId ?: cause?.shortDescription ?: Automated/Unknown
+
+                    env.GIT_BRANCH_NAME = sh(
+                        script: "git rev-parse --abbrev-ref HEAD",
+                        returnStdout: true
+                    ).trim()
+
+                    env.GIT_COMMIT_ID = sh(
+                        script: "git rev-parse HEAD",
+                        returnStdout: true
+                    ).trim()
+                }
+
                 emailext(
-                    subject: "STARTED: ${JOB_NAME} #${BUILD_NUMBER}",
+                    subject: "STARTED: ${JOB_NAME} #${BUILD_NUMBER} | ${params.ENVIRONMENT.toUpperCase()} SETUP",
                     body: """
-Build Started
+This is notified to you: Job Triggered on ${params.ENVIRONMENT.toUpperCase()} SETUP
 
-Job Name: ${JOB_NAME}
-Build Number: ${BUILD_NUMBER}
-Environment: ${params.ENVIRONMENT}
+Build Triggered By : ${env.TRIGGERED_BY}
+Job Name           : ${JOB_NAME}
+Build Number       : ${BUILD_NUMBER}
+Branch Name        : ${env.GIT_BRANCH_NAME}
+Commit ID          : ${env.GIT_COMMIT_ID}
+Environment        : ${params.ENVIRONMENT}
 
-Build URL:
-${BUILD_URL}
+Check console output at:
+${BUILD_URL}console
+
+-- ${BUILD_NUMBER}
 """,
-                    to: "sagarika.mishra@vvdntech.in"
+                    to: "sagarika.mishra@vvdntech.in",
+                    attachLog: true,
+                    compressLog: true
                 )
             }
         }
@@ -51,7 +79,9 @@ ${BUILD_URL}
         stage("Build Docker Image") {
             steps {
                 script {
-                    env.TAG = params.IMAGE_TAG ?: BUILD_NUMBER
+                    env.TAG = params.IMAGE_TAG?.trim()
+                        ? params.IMAGE_TAG.trim()
+                        : BUILD_NUMBER
                 }
 
                 sh """
@@ -109,42 +139,69 @@ ${BUILD_URL}
     post {
 
         success {
+            script {
+                def durationMs = System.currentTimeMillis() - env.BUILD_START_TIME.toLong()
+                def durationMin = (durationMs / 60000).toInteger()
+                def durationSec = ((durationMs % 60000) / 1000).toInteger()
+
+                env.BUILD_DURATION = "${durationMin} min ${durationSec} sec"
+            }
+
             emailext(
-                subject: "SUCCESS: ${JOB_NAME} #${BUILD_NUMBER}",
+                subject: "SUCCESS: ${JOB_NAME} #${BUILD_NUMBER} | ${params.ENVIRONMENT.toUpperCase()} SETUP",
                 body: """
-Build Successful 🚀
+This is notified to you: Job Succeeded on ${params.ENVIRONMENT.toUpperCase()} SETUP
 
-Job Name: ${JOB_NAME}
-Build Number: ${BUILD_NUMBER}
-Environment: ${params.ENVIRONMENT}
+Build Triggered By : ${env.TRIGGERED_BY}
+Job Name           : ${JOB_NAME}
+Build Number       : ${BUILD_NUMBER}
+Branch Name        : ${env.GIT_BRANCH_NAME}
+Commit ID          : ${env.GIT_COMMIT_ID}
+Build Duration     : ${env.BUILD_DURATION}
+Environment        : ${params.ENVIRONMENT}
+Docker Image       : ${ECR_REGISTRY}/${ECR_REPO}:${env.TAG}
 
-Docker Image:
-${ECR_REGISTRY}/${ECR_REPO}:${env.TAG}
+Check console output at:
+${BUILD_URL}console
 
-Build URL:
-${BUILD_URL}
+-- ${BUILD_NUMBER}
 """,
-                to: "sagarika.mishra@vvdntech.in"
+                to: "sagarika.mishra@vvdntech.in",
+                attachLog: true,
+                compressLog: true
             )
         }
 
         failure {
+            script {
+                def durationMs = System.currentTimeMillis() - env.BUILD_START_TIME.toLong()
+                def durationMin = (durationMs / 60000).toInteger()
+                def durationSec = ((durationMs % 60000) / 1000).toInteger()
+
+                env.BUILD_DURATION = "${durationMin} min ${durationSec} sec"
+            }
+
             emailext(
-                subject: "FAILED: ${JOB_NAME} #${BUILD_NUMBER}",
+                subject: "FAILED: ${JOB_NAME} #${BUILD_NUMBER} | ${params.ENVIRONMENT.toUpperCase()} SETUP",
                 body: """
-Build Failed ❌
+This is notified to you: Job FAILED on ${params.ENVIRONMENT.toUpperCase()} SETUP
 
-Job Name: ${JOB_NAME}
-Build Number: ${BUILD_NUMBER}
-Environment: ${params.ENVIRONMENT}
+Build Triggered By : ${env.TRIGGERED_BY}
+Job Name           : ${JOB_NAME}
+Build Number       : ${BUILD_NUMBER}
+Branch Name        : ${env.GIT_BRANCH_NAME}
+Commit ID          : ${env.GIT_COMMIT_ID}
+Build Duration     : ${env.BUILD_DURATION}
+Environment        : ${params.ENVIRONMENT}
 
-Failed Stage:
-${env.STAGE_NAME}
-
-Console Logs:
+Check console output at:
 ${BUILD_URL}console
+
+-- ${BUILD_NUMBER}
 """,
-                to: "sagarika.mishra@vvdntech.in"
+                to: "sagarika.mishra@vvdntech.in",
+                attachLog: true,
+                compressLog: true
             )
         }
     }
