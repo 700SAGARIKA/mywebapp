@@ -7,9 +7,9 @@ pipeline {
 
     parameters {
         choice(
-            name: ENVIRONMENT,
+            name: 'ENVIRONMENT',
             choices: [dev, stage, prod],
-            description: Deployment Environment
+            description: 'Deployment Environment'
         )
 
         string(
