@@ -116,12 +116,29 @@ ${BUILD_URL}console
             }
         }
 
+        stage("Terraform Infra") {
+    when {
+        expression { params.ENVIRONMENT == 'prod' }  // or always
+    }
+    steps {
+        dir('terraform') {
+            sh """
+                terraform init
+                terraform workspace select ${params.ENVIRONMENT} || terraform workspace new ${params.ENVIRONMENT}
+                terraform apply -auto-approve \
+                    -var="environment=${params.ENVIRONMENT}"
+            """
+        }
+    }
+}
+
+
         stage("Deploy to EKS") {
             steps {
                 sh """
                     aws eks update-kubeconfig \
                         --region ${AWS_REGION} \
-                        --name my-eks-cluster
+                        --name my-eks-cluster-tf
 
                     helm upgrade --install ecs-app ./ecs-app \
                         --namespace default \

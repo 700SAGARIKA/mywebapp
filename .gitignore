@@ -64,3 +64,9 @@ aws-secret.yaml
 .dynamodb/
 .pnpm-store
 .vite/
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform.lock.hcl
