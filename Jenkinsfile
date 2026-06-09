@@ -8,14 +8,14 @@ pipeline {
     parameters {
         choice(
             name: 'ENVIRONMENT',
-            choices: ['dev', 'stage', 'prod'],
+            choices: ['dev', 'prod'],
             description: 'Deployment Environment'
         )
 
         string(
             name: 'IMAGE_TAG',
-            defaultValue:'',
-            description: 'Docker Image Tag'
+            defaultValue: '',
+            description: 'Docker Image Tag (leave empty to use build number)'
         )
     }
 
@@ -23,6 +23,7 @@ pipeline {
         AWS_REGION   = "ap-south-1"
         ECR_REPO     = "ecs-app"
         ECR_REGISTRY = "706059253979.dkr.ecr.ap-south-1.amazonaws.com"
+        CLUSTER_NAME = "${params.ENVIRONMENT == 'prod' ? 'my-eks-cluster-prod' : 'my-eks-cluster-dev'}"
     }
 
     stages {
@@ -53,25 +54,22 @@ pipeline {
                 }
 
                 emailext(
-                    subject: "STARTED: ${JOB_NAME} #${BUILD_NUMBER} | ${params.ENVIRONMENT.toUpperCase()} SETUP",
+                    subject: "STARTED: ${JOB_NAME} #${BUILD_NUMBER} | ${params.ENVIRONMENT.toUpperCase()}",
                     body: """
-This is notified to you: Job Triggered on ${params.ENVIRONMENT.toUpperCase()} SETUP
+Build started for ${params.ENVIRONMENT.toUpperCase()} environment.
 
-Build Triggered By : ${env.TRIGGERED_BY}
-Job Name           : ${JOB_NAME}
-Build Number       : ${BUILD_NUMBER}
-Branch Name        : ${env.GIT_BRANCH_NAME}
-Commit ID          : ${env.GIT_COMMIT_ID}
-Environment        : ${params.ENVIRONMENT}
+Triggered By  : ${env.TRIGGERED_BY}
+Job Name      : ${JOB_NAME}
+Build Number  : ${BUILD_NUMBER}
+Branch        : ${env.GIT_BRANCH_NAME}
+Commit        : ${env.GIT_COMMIT_ID}
+Environment   : ${params.ENVIRONMENT}
+Cluster       : ${env.CLUSTER_NAME}
 
-Check console output at:
 ${BUILD_URL}console
-
--- ${BUILD_NUMBER}
 """,
                     to: "sagarika.mishra@vvdntech.in",
-                    attachLog: true,
-                    compressLog: true
+                    attachLog: false
                 )
             }
         }
@@ -83,10 +81,7 @@ ${BUILD_URL}console
                         ? params.IMAGE_TAG.trim()
                         : BUILD_NUMBER
                 }
-
-                sh """
-                    docker build -t ${ECR_REPO}:${env.TAG} .
-                """
+                sh "docker build -t ${ECR_REPO}:${env.TAG} ."
             }
         }
 
@@ -99,53 +94,56 @@ ${BUILD_URL}console
             }
         }
 
-        stage("Tag Docker Image") {
+        stage("Tag and Push Docker Image") {
             steps {
                 sh """
-                    docker tag ${ECR_REPO}:${env.TAG} \
-                    ${ECR_REGISTRY}/${ECR_REPO}:${env.TAG}
-                """
-            }
-        }
-
-        stage("Push Docker Image") {
-            steps {
-                sh """
+                    docker tag ${ECR_REPO}:${env.TAG} ${ECR_REGISTRY}/${ECR_REPO}:${env.TAG}
                     docker push ${ECR_REGISTRY}/${ECR_REPO}:${env.TAG}
                 """
             }
         }
 
         stage("Terraform Infra") {
-    when {
-        expression { params.ENVIRONMENT == 'prod' }  // or always
-    }
-    steps {
-        dir('terraform') {
-            sh """
-                terraform init
-                terraform workspace select ${params.ENVIRONMENT} || terraform workspace new ${params.ENVIRONMENT}
-                terraform apply -auto-approve \
-                    -var="environment=${params.ENVIRONMENT}"
-            """
-        }
-    }
-}
+            steps {
+                dir('terraform') {
+                    sh """
+                        terraform init \
+                            -backend-config=backends/${params.ENVIRONMENT}.tfbackend \
+                            -reconfigure
 
+                        terraform apply -auto-approve \
+                            -var-file=envs/${params.ENVIRONMENT}.tfvars
+                    """
+                }
+            }
+        }
+
+        stage("Approval Gate (prod only)") {
+            when {
+                expression { params.ENVIRONMENT == 'prod' }
+            }
+            steps {
+                timeout(time: 15, unit: 'MINUTES') {
+                    input message: "Deploy build #${BUILD_NUMBER} to PRODUCTION?",
+                          ok: "Deploy"
+                }
+            }
+        }
 
         stage("Deploy to EKS") {
             steps {
                 sh """
                     aws eks update-kubeconfig \
                         --region ${AWS_REGION} \
-                        --name my-eks-cluster-tf
+                        --name ${env.CLUSTER_NAME}
 
                     helm upgrade --install ecs-app ./ecs-app \
                         --namespace default \
                         --wait \
                         --timeout 5m \
                         --set image.repository=${ECR_REGISTRY}/${ECR_REPO} \
-                        --set image.tag=${env.TAG}
+                        --set image.tag=${env.TAG} \
+                        --set podLabels.environment=${params.ENVIRONMENT}
 
                     kubectl rollout status deployment/ecs-app -n default
                 """
@@ -154,34 +152,29 @@ ${BUILD_URL}console
     }
 
     post {
-
         success {
             script {
                 def durationMs = System.currentTimeMillis() - env.BUILD_START_TIME.toLong()
                 def durationMin = (durationMs / 60000).toInteger()
                 def durationSec = ((durationMs % 60000) / 1000).toInteger()
-
-                env.BUILD_DURATION = "${durationMin} min ${durationSec} sec"
+                env.BUILD_DURATION = "${durationMin}m ${durationSec}s"
             }
-
             emailext(
-                subject: "SUCCESS: ${JOB_NAME} #${BUILD_NUMBER} | ${params.ENVIRONMENT.toUpperCase()} SETUP",
+                subject: "SUCCESS: ${JOB_NAME} #${BUILD_NUMBER} | ${params.ENVIRONMENT.toUpperCase()}",
                 body: """
-This is notified to you: Job Succeeded on ${params.ENVIRONMENT.toUpperCase()} SETUP
+Build succeeded for ${params.ENVIRONMENT.toUpperCase()} environment.
 
-Build Triggered By : ${env.TRIGGERED_BY}
-Job Name           : ${JOB_NAME}
-Build Number       : ${BUILD_NUMBER}
-Branch Name        : ${env.GIT_BRANCH_NAME}
-Commit ID          : ${env.GIT_COMMIT_ID}
-Build Duration     : ${env.BUILD_DURATION}
-Environment        : ${params.ENVIRONMENT}
-Docker Image       : ${ECR_REGISTRY}/${ECR_REPO}:${env.TAG}
+Triggered By  : ${env.TRIGGERED_BY}
+Job Name      : ${JOB_NAME}
+Build Number  : ${BUILD_NUMBER}
+Branch        : ${env.GIT_BRANCH_NAME}
+Commit        : ${env.GIT_COMMIT_ID}
+Duration      : ${env.BUILD_DURATION}
+Environment   : ${params.ENVIRONMENT}
+Cluster       : ${env.CLUSTER_NAME}
+Docker Image  : ${ECR_REGISTRY}/${ECR_REPO}:${env.TAG}
 
-Check console output at:
 ${BUILD_URL}console
-
--- ${BUILD_NUMBER}
 """,
                 to: "sagarika.mishra@vvdntech.in",
                 attachLog: true,
@@ -194,27 +187,22 @@ ${BUILD_URL}console
                 def durationMs = System.currentTimeMillis() - env.BUILD_START_TIME.toLong()
                 def durationMin = (durationMs / 60000).toInteger()
                 def durationSec = ((durationMs % 60000) / 1000).toInteger()
-
-                env.BUILD_DURATION = "${durationMin} min ${durationSec} sec"
+                env.BUILD_DURATION = "${durationMin}m ${durationSec}s"
             }
-
             emailext(
-                subject: "FAILED: ${JOB_NAME} #${BUILD_NUMBER} | ${params.ENVIRONMENT.toUpperCase()} SETUP",
+                subject: "FAILED: ${JOB_NAME} #${BUILD_NUMBER} | ${params.ENVIRONMENT.toUpperCase()}",
                 body: """
-This is notified to you: Job FAILED on ${params.ENVIRONMENT.toUpperCase()} SETUP
+Build FAILED for ${params.ENVIRONMENT.toUpperCase()} environment.
 
-Build Triggered By : ${env.TRIGGERED_BY}
-Job Name           : ${JOB_NAME}
-Build Number       : ${BUILD_NUMBER}
-Branch Name        : ${env.GIT_BRANCH_NAME}
-Commit ID          : ${env.GIT_COMMIT_ID}
-Build Duration     : ${env.BUILD_DURATION}
-Environment        : ${params.ENVIRONMENT}
+Triggered By  : ${env.TRIGGERED_BY}
+Job Name      : ${JOB_NAME}
+Build Number  : ${BUILD_NUMBER}
+Branch        : ${env.GIT_BRANCH_NAME}
+Commit        : ${env.GIT_COMMIT_ID}
+Duration      : ${env.BUILD_DURATION}
+Environment   : ${params.ENVIRONMENT}
 
-Check console output at:
 ${BUILD_URL}console
-
--- ${BUILD_NUMBER}
 """,
                 to: "sagarika.mishra@vvdntech.in",
                 attachLog: true,

@@ -70,3 +70,6 @@ terraform/.terraform/
 terraform/*.tfstate
 terraform/*.tfstate.backup
 terraform/.terraform.lock.hcl
+terraform/cacerts.pem
+terraform/charts/
+terraform/cacerts.pem
