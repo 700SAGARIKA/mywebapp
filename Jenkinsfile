@@ -6,12 +6,6 @@ pipeline {
     }
 
     parameters {
-        choice(
-            name: 'ENVIRONMENT',
-            choices: ['dev', 'prod'],
-            description: 'Deployment Environment'
-        )
-
         string(
             name: 'IMAGE_TAG',
             defaultValue: '',
@@ -33,6 +27,22 @@ pipeline {
             }
         }
 
+        stage("Select Environment") {
+            steps {
+                script {
+                    timeout(time: 30, unit: 'MINUTES') {
+                        env.ENVIRONMENT = input(
+                            message: 'Select deployment environment',
+                            parameters: [
+                                choice(name: 'ENVIRONMENT', choices: ['dev', 'prod'], description: 'Target environment')
+                            ]
+                        )
+                    }
+                    env.CLUSTER_NAME = env.ENVIRONMENT == 'prod' ? 'my-eks-cluster-prod' : 'my-eks-cluster-tf'
+                }
+            }
+        }
+
         stage("Build Started Notification") {
             steps {
                 script {
@@ -40,8 +50,6 @@ pipeline {
 
                     def cause = currentBuild.getBuildCauses()[0]
                     env.TRIGGERED_BY = cause?.userId ?: cause?.shortDescription ?: 'Automated/Unknown'
-
-                    env.CLUSTER_NAME = params.ENVIRONMENT == 'prod' ? 'my-eks-cluster-prod' : 'my-eks-cluster-tf'
 
                     env.GIT_BRANCH_NAME = sh(
                         script: "git rev-parse --abbrev-ref HEAD",
@@ -55,16 +63,16 @@ pipeline {
                 }
 
                 emailext(
-                    subject: "STARTED: ${JOB_NAME} #${BUILD_NUMBER} | ${params.ENVIRONMENT.toUpperCase()}",
+                    subject: "STARTED: ${JOB_NAME} #${BUILD_NUMBER} | ${env.ENVIRONMENT.toUpperCase()}",
                     body: """
-Build started for ${params.ENVIRONMENT.toUpperCase()} environment.
+Build started for ${env.ENVIRONMENT.toUpperCase()} environment.
 
 Triggered By  : ${env.TRIGGERED_BY}
 Job Name      : ${JOB_NAME}
 Build Number  : ${BUILD_NUMBER}
 Branch        : ${env.GIT_BRANCH_NAME}
 Commit        : ${env.GIT_COMMIT_ID}
-Environment   : ${params.ENVIRONMENT}
+Environment   : ${env.ENVIRONMENT}
 Cluster       : ${env.CLUSTER_NAME}
 
 ${BUILD_URL}console
@@ -127,11 +135,11 @@ ${BUILD_URL}console
                 dir('terraform') {
                     sh """
                         terraform init \
-                            -backend-config=backends/${params.ENVIRONMENT}.tfbackend \
+                            -backend-config=backends/${env.ENVIRONMENT}.tfbackend \
                             -reconfigure
 
                         terraform apply -auto-approve \
-                            -var-file=envs/${params.ENVIRONMENT}.tfvars
+                            -var-file=envs/${env.ENVIRONMENT}.tfvars
                     """
                 }
             }
@@ -139,7 +147,7 @@ ${BUILD_URL}console
 
         stage("Approval Gate (prod only)") {
             when {
-                expression { params.ENVIRONMENT == 'prod' }
+                expression { env.ENVIRONMENT == 'prod' }
             }
             steps {
                 timeout(time: 15, unit: 'MINUTES') {
@@ -162,7 +170,7 @@ ${BUILD_URL}console
                         --timeout 5m \
                         --set image.repository=${ECR_REGISTRY}/${ECR_REPO} \
                         --set image.tag=${env.TAG} \
-                        --set podLabels.environment=${params.ENVIRONMENT}
+                        --set podLabels.environment=${env.ENVIRONMENT}
 
                     kubectl rollout status deployment/ecs-app -n default
                 """
@@ -179,9 +187,9 @@ ${BUILD_URL}console
                 env.BUILD_DURATION = "${durationMin}m ${durationSec}s"
             }
             emailext(
-                subject: "SUCCESS: ${JOB_NAME} #${BUILD_NUMBER} | ${params.ENVIRONMENT.toUpperCase()}",
+                subject: "SUCCESS: ${JOB_NAME} #${BUILD_NUMBER} | ${env.ENVIRONMENT.toUpperCase()}",
                 body: """
-Build succeeded for ${params.ENVIRONMENT.toUpperCase()} environment.
+Build succeeded for ${env.ENVIRONMENT.toUpperCase()} environment.
 
 Triggered By  : ${env.TRIGGERED_BY}
 Job Name      : ${JOB_NAME}
@@ -189,7 +197,7 @@ Build Number  : ${BUILD_NUMBER}
 Branch        : ${env.GIT_BRANCH_NAME}
 Commit        : ${env.GIT_COMMIT_ID}
 Duration      : ${env.BUILD_DURATION}
-Environment   : ${params.ENVIRONMENT}
+Environment   : ${env.ENVIRONMENT}
 Cluster       : ${env.CLUSTER_NAME}
 Docker Image  : ${ECR_REGISTRY}/${ECR_REPO}:${env.TAG}
 
@@ -209,9 +217,9 @@ ${BUILD_URL}console
                 env.BUILD_DURATION = "${durationMin}m ${durationSec}s"
             }
             emailext(
-                subject: "FAILED: ${JOB_NAME} #${BUILD_NUMBER} | ${params.ENVIRONMENT.toUpperCase()}",
+                subject: "FAILED: ${JOB_NAME} #${BUILD_NUMBER} | ${env.ENVIRONMENT.toUpperCase()}",
                 body: """
-Build FAILED for ${params.ENVIRONMENT.toUpperCase()} environment.
+Build FAILED for ${env.ENVIRONMENT.toUpperCase()} environment.
 
 Triggered By  : ${env.TRIGGERED_BY}
 Job Name      : ${JOB_NAME}
@@ -219,7 +227,7 @@ Build Number  : ${BUILD_NUMBER}
 Branch        : ${env.GIT_BRANCH_NAME}
 Commit        : ${env.GIT_COMMIT_ID}
 Duration      : ${env.BUILD_DURATION}
-Environment   : ${params.ENVIRONMENT}
+Environment   : ${env.ENVIRONMENT}
 
 ${BUILD_URL}console
 """,
