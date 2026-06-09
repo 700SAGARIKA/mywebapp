@@ -104,6 +104,24 @@ ${BUILD_URL}console
             }
         }
 
+        stage("Download Helm Charts") {
+            steps {
+                sh """
+                    mkdir -p terraform/charts
+                    cd terraform/charts
+                    curl --insecure -sL "https://aws.github.io/eks-charts/aws-load-balancer-controller-3.4.0.tgz" -o alb.tgz
+                    curl --insecure -sL "https://aws.github.io/eks-charts/aws-for-fluent-bit-0.2.0.tgz" -o fluent-bit.tgz
+                    curl --insecure -sL "https://github.com/kubernetes/autoscaler/releases/download/cluster-autoscaler-chart-9.57.0/cluster-autoscaler-9.57.0.tgz" -o autoscaler.tgz
+                    curl --insecure -sL "https://github.com/kubernetes-sigs/metrics-server/releases/download/metrics-server-helm-chart-3.13.0/metrics-server-3.13.0.tgz" -o metrics-server.tgz
+                    curl --insecure -sL "https://github.com/kubernetes-sigs/external-dns/releases/download/external-dns-helm-chart-1.21.1/external-dns-1.21.1.tgz" -o external-dns.tgz
+                    for f in *.tgz; do tar -xzf "\$f"; done
+
+                    # CA bundle for Terraform Helm provider TLS
+                    curl --insecure -sL https://curl.se/ca/cacert.pem -o ../cacerts.pem
+                """
+            }
+        }
+
         stage("Terraform Infra") {
             steps {
                 dir('terraform') {
