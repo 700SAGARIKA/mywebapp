@@ -23,7 +23,6 @@ pipeline {
         AWS_REGION   = "ap-south-1"
         ECR_REPO     = "ecs-app"
         ECR_REGISTRY = "706059253979.dkr.ecr.ap-south-1.amazonaws.com"
-        CLUSTER_NAME = "${params.ENVIRONMENT == 'prod' ? 'my-eks-cluster-prod' : 'my-eks-cluster-dev'}"
     }
 
     stages {
@@ -41,6 +40,8 @@ pipeline {
 
                     def cause = currentBuild.getBuildCauses()[0]
                     env.TRIGGERED_BY = cause?.userId ?: cause?.shortDescription ?: 'Automated/Unknown'
+
+                    env.CLUSTER_NAME = params.ENVIRONMENT == 'prod' ? 'my-eks-cluster-prod' : 'my-eks-cluster-tf'
 
                     env.GIT_BRANCH_NAME = sh(
                         script: "git rev-parse --abbrev-ref HEAD",
