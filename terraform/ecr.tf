@@ -1,4 +1,5 @@
 resource "aws_ecr_repository" "app" {
+  count                = var.environment == "dev" ? 1 : 0
   name                 = var.ecr_repo_name
   image_tag_mutability = "MUTABLE"
 
@@ -10,7 +11,8 @@ resource "aws_ecr_repository" "app" {
 }
 
 resource "aws_ecr_lifecycle_policy" "app" {
-  repository = aws_ecr_repository.app.name
+  count      = var.environment == "dev" ? 1 : 0
+  repository = var.ecr_repo_name
   policy = jsonencode({
     rules = [{
       rulePriority = 1
@@ -23,8 +25,14 @@ resource "aws_ecr_lifecycle_policy" "app" {
       action = { type = "expire" }
     }]
   })
+  depends_on = [aws_ecr_repository.app]
+}
+
+data "aws_ecr_repository" "app" {
+  name       = var.ecr_repo_name
+  depends_on = [aws_ecr_repository.app]
 }
 
 output "ecr_repository_url" {
-  value = aws_ecr_repository.app.repository_url
+  value = data.aws_ecr_repository.app.repository_url
 }
