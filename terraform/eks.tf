@@ -24,16 +24,26 @@ module "eks" {
   }
 
   access_entries = {
-    jenkins = {
-      principal_arn = "arn:aws:iam::${var.account_id}:role/ec2-role"
-      policy_associations = {
-        admin = {
-          policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-          access_scope = { type = "cluster" }
-        }
+  jenkins = {
+    principal_arn = "arn:aws:iam::${var.account_id}:role/ec2-role"
+    policy_associations = {
+      admin = {
+        policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+        access_scope = { type = "cluster" }
       }
     }
   }
+  root = {
+    principal_arn = "arn:aws:iam::${var.account_id}:root"
+    policy_associations = {
+      admin = {
+        policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+        access_scope = { type = "cluster" }
+      }
+    }
+  }
+}
+
 
   eks_managed_node_groups = {
     ng-clean = {

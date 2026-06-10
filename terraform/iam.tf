@@ -3,7 +3,7 @@ module "alb_controller_irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 5.0"
 
-  role_name = "aws-load-balancer-controller"
+  role_name = "${var.environment}-aws-load-balancer-controller"
 
   attach_load_balancer_controller_policy = true
 
@@ -20,7 +20,7 @@ module "app_irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 5.0"
 
-  role_name = "ecs-app-irsa-role"
+  role_name = "${var.environment}-ecs-app-irsa-role"
 
   oidc_providers = {
     main = {
@@ -35,7 +35,7 @@ module "cluster_autoscaler_irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 5.0"
 
-  role_name                        = "cluster-autoscaler"
+  role_name                        = "${var.environment}-cluster-autoscaler"
   attach_cluster_autoscaler_policy = true
   cluster_autoscaler_cluster_names = [var.cluster_name]
 
@@ -51,7 +51,7 @@ module "external_dns_irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 5.0"
 
-  role_name                  = "external-dns"
+  role_name                  = "${var.environment}-external-dns"
   attach_external_dns_policy = true
   external_dns_hosted_zone_arns = ["arn:aws:route53:::hostedzone/*"]
 
@@ -65,7 +65,7 @@ module "external_dns_irsa" {
 
 # Policy granting app access to its Secrets Manager secret
 resource "aws_iam_policy" "app_secrets" {
-  name = "ecs-app-secrets-policy"
+  name = "${var.environment}-ecs-app-secrets-policy"
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -85,7 +85,7 @@ module "fluent_bit_irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 5.0"
 
-  role_name                              = "fluent-bit"
+  role_name                              = "${var.environment}-fluent-bit"
   attach_cloudwatch_observability_policy = true
 
   oidc_providers = {
