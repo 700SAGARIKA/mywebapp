@@ -52,6 +52,7 @@ module "eks" {
       max_size       = var.node_max_size
       desired_size   = var.node_desired_size
       disk_size      = var.node_disk_size
+      capacity_type  = var.node_capacity_type
 
       labels = { role = "apps" }
     }

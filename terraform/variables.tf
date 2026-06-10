@@ -9,3 +9,4 @@ variable "node_desired_size"  {}
 variable "node_min_size"      {}
 variable "node_max_size"      {}
 variable "node_disk_size"     {}
+variable "node_capacity_type" { default = "ON_DEMAND" }
