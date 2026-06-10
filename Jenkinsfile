@@ -170,7 +170,8 @@ ${BUILD_URL}console
                         --timeout 5m \
                         --set image.repository=${ECR_REGISTRY}/${ECR_REPO} \
                         --set image.tag=${env.TAG} \
-                        --set podLabels.environment=${env.ENVIRONMENT}
+                        --set podLabels.environment=${env.ENVIRONMENT} \
+                        --set serviceAccount.annotations."eks\\.amazonaws\\.com/role-arn"=arn:aws:iam::706059253979:role/${env.ENVIRONMENT}-ecs-app-irsa-role
 
                     kubectl rollout status deployment/ecs-app -n default
                 """
