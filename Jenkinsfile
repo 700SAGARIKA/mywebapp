@@ -132,15 +132,18 @@ ${BUILD_URL}console
 
         stage("Terraform Infra") {
             steps {
-                dir('terraform') {
-                    sh """
-                        terraform init \
-                            -backend-config=backends/${env.ENVIRONMENT}.tfbackend \
-                            -reconfigure
+                withCredentials([string(credentialsId: 'GRAFANA_ADMIN_PASSWORD', variable: 'GRAFANA_ADMIN_PASSWORD')]) {
+                    dir('terraform') {
+                        sh """
+                            terraform init \
+                                -backend-config=backends/${env.ENVIRONMENT}.tfbackend \
+                                -reconfigure
 
-                        terraform apply -auto-approve \
-                            -var-file=envs/${env.ENVIRONMENT}.tfvars
-                    """
+                            TF_VAR_grafana_admin_password=\${GRAFANA_ADMIN_PASSWORD} \
+                            terraform apply -auto-approve \
+                                -var-file=envs/${env.ENVIRONMENT}.tfvars
+                        """
+                    }
                 }
             }
         }
