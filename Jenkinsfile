@@ -122,6 +122,7 @@ ${BUILD_URL}console
                     curl --insecure -sL "https://github.com/kubernetes/autoscaler/releases/download/cluster-autoscaler-chart-9.57.0/cluster-autoscaler-9.57.0.tgz" -o autoscaler.tgz
                     curl --insecure -sL "https://github.com/kubernetes-sigs/metrics-server/releases/download/metrics-server-helm-chart-3.13.0/metrics-server-3.13.0.tgz" -o metrics-server.tgz
                     curl --insecure -sL "https://github.com/kubernetes-sigs/external-dns/releases/download/external-dns-helm-chart-1.21.1/external-dns-1.21.1.tgz" -o external-dns.tgz
+                    curl --insecure -sL "https://prometheus-community.github.io/helm-charts/kube-prometheus-stack-61.3.2.tgz" -o prometheus-stack.tgz
                     for f in *.tgz; do tar -xzf "\$f"; done
 
                     # CA bundle for Terraform Helm provider TLS
@@ -132,7 +133,10 @@ ${BUILD_URL}console
 
         stage("Terraform Infra") {
             steps {
-                withCredentials([string(credentialsId: 'GRAFANA_ADMIN_PASSWORD', variable: 'GRAFANA_ADMIN_PASSWORD')]) {
+                withCredentials([
+                    string(credentialsId: 'GRAFANA_ADMIN_PASSWORD', variable: 'GRAFANA_ADMIN_PASSWORD'),
+                    usernamePassword(credentialsId: '35735d98-ba29-44c1-a304-4b449383569f', usernameVariable: 'SMTP_USERNAME', passwordVariable: 'SMTP_PASSWORD')
+                ]) {
                     dir('terraform') {
                         sh """
                             terraform init \
@@ -140,6 +144,7 @@ ${BUILD_URL}console
                                 -reconfigure
 
                             TF_VAR_grafana_admin_password=\${GRAFANA_ADMIN_PASSWORD} \
+                            TF_VAR_smtp_password=\${SMTP_PASSWORD} \
                             terraform apply -auto-approve \
                                 -var-file=envs/${env.ENVIRONMENT}.tfvars
                         """
