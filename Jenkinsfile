@@ -122,7 +122,7 @@ ${BUILD_URL}console
                     curl --insecure -sL "https://github.com/kubernetes/autoscaler/releases/download/cluster-autoscaler-chart-9.57.0/cluster-autoscaler-9.57.0.tgz" -o autoscaler.tgz
                     curl --insecure -sL "https://github.com/kubernetes-sigs/metrics-server/releases/download/metrics-server-helm-chart-3.13.0/metrics-server-3.13.0.tgz" -o metrics-server.tgz
                     curl --insecure -sL "https://github.com/kubernetes-sigs/external-dns/releases/download/external-dns-helm-chart-1.21.1/external-dns-1.21.1.tgz" -o external-dns.tgz
-                    curl --insecure -sL "https://prometheus-community.github.io/helm-charts/kube-prometheus-stack-61.3.2.tgz" -o prometheus-stack.tgz
+                    curl --insecure -sL "https://github.com/prometheus-community/helm-charts/releases/download/kube-prometheus-stack-61.3.2/kube-prometheus-stack-61.3.2.tgz" -o prometheus-stack.tgz
                     for f in *.tgz; do tar -xzf "\$f"; done
 
                     # CA bundle for Terraform Helm provider TLS
