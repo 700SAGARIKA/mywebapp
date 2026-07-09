@@ -96,6 +96,37 @@ module "fluent_bit_irsa" {
   }
 }
 
+# IRSA for the EBS CSI driver addon - required for any PVC backed by the
+# gp2/gp3 StorageClass (e.g. Grafana's persistent volume) to actually
+# provision; without this the driver has no permissions to create/attach
+# EBS volumes and PVCs sit in Pending forever.
+module "ebs_csi_irsa" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.0"
+
+  role_name              = "${var.environment}-ebs-csi-driver"
+  attach_ebs_csi_policy  = true
+
+  oidc_providers = {
+    main = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["kube-system:ebs-csi-controller-sa"]
+    }
+  }
+}
+
+# Added as a standalone addon (not inside module.eks's cluster_addons) since
+# putting it there would create a cycle: cluster_addons needs
+# ebs_csi_irsa.iam_role_arn as an input, but ebs_csi_irsa needs module.eks's
+# oidc_provider_arn output.
+resource "aws_eks_addon" "ebs_csi_driver" {
+  cluster_name             = module.eks.cluster_name
+  addon_name               = "aws-ebs-csi-driver"
+  service_account_role_arn = module.ebs_csi_irsa.iam_role_arn
+
+  depends_on = [module.eks, module.ebs_csi_irsa]
+}
+
 # Lets Grafana's CloudWatch datasource read pod logs shipped by fluent-bit,
 # so logs can be viewed in Grafana next to the CPU/memory dashboards.
 module "grafana_cloudwatch_irsa" {
