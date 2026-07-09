@@ -5,3 +5,10 @@ backend/node_modules
 .git
 .gitignore
 README.md
+
+# Jenkins reuses the same workspace across builds and the "Download Helm
+# Charts" stage runs after this Docker build stage, so charts downloaded/
+# extracted by the *previous* build (including the large kube-prometheus-stack
+# chart) sit here and get sent to the Docker daemon as build context every
+# time - this alone was ~900MB of unnecessary context per build.
+terraform
