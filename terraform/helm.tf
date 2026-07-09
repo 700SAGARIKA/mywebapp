@@ -149,6 +149,19 @@ resource "helm_release" "prometheus_stack" {
     value = "false"
   }
 
+  # Without an explicit root_url, Grafana guesses its own public address for
+  # any self-generated absolute link (password reset emails, invites) and
+  # falls back to the container's internal port 3000 instead of the ALB's
+  # 443 - reset emails end up pointing at a port nothing external can reach.
+  set {
+    name  = "grafana.grafana\\.ini.server.root_url"
+    value = "https://grafana.ordr.fun/"
+  }
+  set {
+    name  = "grafana.grafana\\.ini.server.domain"
+    value = "grafana.ordr.fun"
+  }
+
   # Grafana built-in SMTP — enables email from Grafana-native contact points
   set {
     name  = "grafana.grafana\\.ini.smtp.enabled"
