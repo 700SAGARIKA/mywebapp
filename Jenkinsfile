@@ -77,7 +77,7 @@ Cluster       : ${env.CLUSTER_NAME}
 
 ${BUILD_URL}console
 """,
-                    to: "sagarika.mishra@vvdntech.in",
+                    to: '$DEFAULT_RECIPIENTS',
                     attachLog: false
                 )
             }
@@ -220,7 +220,7 @@ Docker Image  : ${ECR_REGISTRY}/${ECR_REPO}:${env.TAG}
 
 ${BUILD_URL}console
 """,
-                to: "sagarika.mishra@vvdntech.in",
+                to: '$DEFAULT_RECIPIENTS',
                 attachLog: true,
                 compressLog: true
             )
@@ -248,7 +248,7 @@ Environment   : ${env.ENVIRONMENT}
 
 ${BUILD_URL}console
 """,
-                to: "sagarika.mishra@vvdntech.in",
+                to: '$DEFAULT_RECIPIENTS',
                 attachLog: true,
                 compressLog: true
             )
