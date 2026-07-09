@@ -108,6 +108,14 @@ ${BUILD_URL}console
                 sh """
                     docker tag ${ECR_REPO}:${env.TAG} ${ECR_REGISTRY}/${ECR_REPO}:${env.TAG}
                     docker push ${ECR_REGISTRY}/${ECR_REPO}:${env.TAG}
+
+                    # Each build tags a new ecs-app:<build_number> image, and Docker
+                    # never garbage-collects layers referenced by a tag - left alone
+                    # this fills the agent's disk after enough builds ("no space left
+                    # on device"). The image lives in ECR now, so the local copies
+                    # aren't needed - remove them and prune dangling build cache.
+                    docker rmi ${ECR_REPO}:${env.TAG} ${ECR_REGISTRY}/${ECR_REPO}:${env.TAG} || true
+                    docker image prune -f
                 """
             }
         }
