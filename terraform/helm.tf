@@ -142,6 +142,17 @@ resource "helm_release" "prometheus_stack" {
     value = "5Gi"
   }
 
+  # Grafana's PVC is ReadWriteOnce - only one pod can mount it at a time.
+  # The chart's default RollingUpdate strategy tries to bring up the new pod
+  # before killing the old one on any pod-template change; since a single
+  # RWO volume can't attach to both, the new pod deadlocks in Init forever
+  # (FailedAttachVolume: Multi-Attach error) and helm --wait hangs until
+  # Terraform's apply times out. Recreate tears down the old pod first.
+  set {
+    name  = "grafana.deploymentStrategy.type"
+    value = "Recreate"
+  }
+
   # Grafana chart validates that secrets aren't passed in plain values — disable
   # so smtp.password can be injected directly from var.smtp_password
   set {
