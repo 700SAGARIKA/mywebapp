@@ -25,7 +25,10 @@ variable "acm_certificate_arn" {
 variable "smtp_host" {
   description = "SMTP server hostname for Alertmanager email alerts"
   type        = string
-  default     = "smtp.vvdntech.in:587"
+  # vvdntech.in mail is actually routed through Google Workspace (the app
+  # password used here is a Google App Password) - smtp.vvdntech.in doesn't
+  # resolve at all (NXDOMAIN), it was never a real mail relay.
+  default = "smtp.gmail.com:587"
 }
 
 variable "smtp_password" {

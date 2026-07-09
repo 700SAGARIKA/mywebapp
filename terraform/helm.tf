@@ -125,6 +125,39 @@ resource "helm_release" "prometheus_stack" {
     value = var.grafana_admin_password # add this to variables.tf + tfvars
   }
 
+  # Grafana chart validates that secrets aren't passed in plain values — disable
+  # so smtp.password can be injected directly from var.smtp_password
+  set {
+    name  = "grafana.assertNoLeakedSecrets"
+    value = "false"
+  }
+
+  # Grafana built-in SMTP — enables email from Grafana-native contact points
+  set {
+    name  = "grafana.grafana\\.ini.smtp.enabled"
+    value = "true"
+  }
+  set {
+    name  = "grafana.grafana\\.ini.smtp.host"
+    value = var.smtp_host
+  }
+  set {
+    name  = "grafana.grafana\\.ini.smtp.user"
+    value = "sagarika.mishra@vvdntech.in"
+  }
+  set {
+    name  = "grafana.grafana\\.ini.smtp.password"
+    value = var.smtp_password
+  }
+  set {
+    name  = "grafana.grafana\\.ini.smtp.from_address"
+    value = "sagarika.mishra@vvdntech.in"
+  }
+  set {
+    name  = "grafana.grafana\\.ini.smtp.from_name"
+    value = "Grafana Alerts"
+  }
+
   # Let the dashboard sidecar file provisioned dashboards into folders based on
   # a configmap annotation, so dashboards-as-code can land in nested folders
   # (e.g. "app.dashboard/Namespaces-pannel") instead of always landing in General.
@@ -220,6 +253,20 @@ resource "helm_release" "prometheus_stack" {
     value = "15d"
   }
 
+  # EKS hides control plane components — these rules always fire as false positives
+  set {
+    name  = "defaultRules.rules.kubeControllerManager"
+    value = "false"
+  }
+  set {
+    name  = "defaultRules.rules.kubeSchedulerAlerting"
+    value = "false"
+  }
+  set {
+    name  = "defaultRules.rules.kubeSchedulerRecording"
+    value = "false"
+  }
+
   # Alertmanager — email via corporate SMTP
   set {
     name  = "alertmanager.config.global.smtp_smarthost"
@@ -279,6 +326,7 @@ resource "helm_release" "prometheus_stack" {
   set {
     name  = "alertmanager.config.receivers[0].name"
     value = "null"
+    type  = "string"   # without this, YAML parses null as None not the string "null"
   }
   set {
     name  = "alertmanager.config.receivers[1].name"

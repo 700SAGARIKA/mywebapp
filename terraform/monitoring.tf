@@ -61,7 +61,20 @@ resource "kubernetes_manifest" "app_prometheus_rules" {
                 summary     = "Pod {{ $labels.pod }} is not ready"
                 description = "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been unready for 2 minutes."
               }
+            },
+            {
+              alert = "AppDeploymentDown"
+              expr  = "kube_deployment_status_replicas_available{namespace=\"default\", deployment=\"ecs-app\"} == 0"
+              for   = "1m"
+              labels = {
+                severity = "critical"
+              }
+              annotations = {
+                summary     = "ecs-app has 0 running replicas"
+                description = "Deployment ecs-app in default namespace has no available replicas."
+              }
             }
+
           ]
         }
       ]
