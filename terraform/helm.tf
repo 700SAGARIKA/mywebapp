@@ -125,6 +125,23 @@ resource "helm_release" "prometheus_stack" {
     value = var.grafana_admin_password # add this to variables.tf + tfvars
   }
 
+  # Grafana's default install has no persistent volume - its sqlite DB (admin
+  # user email, any in-UI changes) lives in ephemeral pod storage and resets
+  # to factory defaults on every pod restart. Give it a real PVC so account
+  # state actually survives upgrades/restarts.
+  set {
+    name  = "grafana.persistence.enabled"
+    value = "true"
+  }
+  set {
+    name  = "grafana.persistence.storageClassName"
+    value = "gp2"
+  }
+  set {
+    name  = "grafana.persistence.size"
+    value = "5Gi"
+  }
+
   # Grafana chart validates that secrets aren't passed in plain values — disable
   # so smtp.password can be injected directly from var.smtp_password
   set {
